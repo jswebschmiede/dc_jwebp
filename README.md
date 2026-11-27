@@ -4,7 +4,7 @@ DC JWebP is a lightweight and fully automatic Joomla system plugin that optimize
 
 ## Features
 - Automatic JPG/PNG → WebP conversion  
-- Replaces `src` and `srcset` of `<img>` tags and inline CSS `background-image` URLs in the final HTML output; other occurrences of a path (links, `data-src`, scripts) stay untouched  
+- Replaces `src` and `srcset` of `<img>` tags, `srcset` of `<source>` tags in `<picture>` and inline CSS `background-image` URLs in the final HTML output; other occurrences of a path (links, `data-src`, scripts) stay untouched  
 - Native lazy loading (`loading="lazy"`) — no JavaScript required; the first images of the page and images with `fetchpriority` load immediately, and content of `<script>`, `<template>` and `<noscript>` is never changed  
 - Converts each image once and re-creates the WebP when the original changes; keeps the original when the WebP would not be smaller  
 - Broken, unsupported or very large images (over 25 megapixels) are skipped instead of breaking the page; JPEG photos are rotated according to their EXIF orientation  
@@ -48,7 +48,8 @@ The conversion runs after media-action plugins such as Resize, so the WebP is ma
 The folder reload in "Add WebP" mode uses internals of the media manager app of Joomla 5/6. If a later Joomla version changes them, the copy is only listed after reloading the page; uploading is not affected.
 
 ## Limitations
-- `<picture>`/`<source srcset>`, external CSS files and the shorthand `background: url(...)` are not rewritten.
+- External CSS files and the shorthand `background: url(...)` are not rewritten.
+- A `<source>` with `type="image/jpeg"` or `type="image/png"` is only rewritten when every image in its `srcset` has a WebP version; its `type` then becomes `image/webp`. A `<source>` with any other `type` stays unchanged.
 - Browsers without WebP support get no fallback.
 - Images reached through a symbolic link that points outside the Joomla root are skipped.
 - GD drops ICC colour profiles; mirrored EXIF orientations (2, 4, 5, 7) are not corrected.
@@ -92,7 +93,7 @@ Runs Rector (dry-run) and PHPCS and stops on any finding. Then it packs `src/` a
 
 ## Releasing
 1. Raise `<version>` in `src/dc_jwebp.xml` and add an entry to `CHANGELOG.md`.
-2. Commit, then tag and push: `git tag v1.3.1 && git push origin v1.3.1`.
+2. Commit, then tag and push: `git tag v1.4.0 && git push origin v1.4.0`.
 3. The GitHub Actions workflow checks that the tag matches the manifest version, runs the same checks, and creates the GitHub release with the ZIP attached.
 
 In a fork, the workflow titles the release `vX.Y.Z (fork build)` and puts a notice in front of the release notes. The notice links to the original repository and to `CHANGELOG.md`. In the original repository, no notice is added.
