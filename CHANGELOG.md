@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 – 2026-11-27
+
+Modified by jswebschmiede (https://github.com/jswebschmiede) on 2026-11-27.
+
+- `srcset` of `<source>` tags in `<picture>` is rewritten, candidate by candidate, like the `srcset` of `<img>`. Before, only the `<img>` of a `<picture>` got the WebP.
+- A `<source>` with `type="image/jpeg"` or `type="image/png"` is only rewritten when every candidate has a WebP version, and its `type` becomes `image/webp`. A `<source>` with any other `type` (for example `image/webp` or `image/avif`), `data-srcset` and `<source src>` of video and audio stay unchanged.
+
 ## 1.3.1 – 2026-11-27
 
 Modified by jswebschmiede (https://github.com/jswebschmiede) on 2026-11-27.

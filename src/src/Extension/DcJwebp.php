@@ -4,7 +4,7 @@
  * @package     DC JWebP
  * @subpackage  System Plugin
  *
- * @version     1.3.1
+ * @version     1.4.0
  * @copyright   Design Cart
  * @license     GNU General Public License version 3; see LICENSE.md
  * @author      Design Cart
@@ -18,6 +18,7 @@
  * limit per request, lossless PNG.
  * Modified 2026-11-27 by jswebschmiede: conversion on upload in the media manager.
  * Modified 2026-11-27 by jswebschmiede: list the WebP copy in the media manager right after upload.
+ * Modified 2026-11-27 by jswebschmiede: srcset of source tags in picture elements.
  */
 
 declare(strict_types=1);
@@ -538,6 +539,12 @@ final class DcJwebp extends CMSPlugin implements SubscriberInterface
             $body
         ) ?? $body;
 
+        $body = preg_replace_callback(
+            '/<source\b[^>]*>/i',
+            fn (array $m): string => $this->rewriteSourceTag($m[0]),
+            $body
+        ) ?? $body;
+
         return preg_replace_callback(
             '/(background-image:\s*url\(\s*)(["\']?)([^"\')\s]+)\2(\s*\))/i',
             fn (array $m): string => $m[1] . $m[2] . $this->toWebpUrl($m[3]) . $m[2] . $m[4],
@@ -546,25 +553,85 @@ final class DcJwebp extends CMSPlugin implements SubscriberInterface
     }
 
     /**
+     * Rewrites the srcset of a source tag inside a picture element.
+     *
+     * Without a type attribute every candidate is rewritten on its own, as for img tags. With
+     * type="image/jpeg" or type="image/png" the srcset is only rewritten when every candidate
+     * has a WebP version; the type then becomes image/webp, so it matches the files and browsers
+     * without WebP support skip the source. Other types and source tags without srcset (video,
+     * audio) stay unchanged.
+     *
+     * @param   string  $tag  Complete source start tag
+     *
+     * @return  string
+     *
+     * @since   1.4.0
+     */
+    private function rewriteSourceTag(string $tag): string
+    {
+        // "\s" before srcset excludes data-srcset.
+        if (preg_match('/(\ssrcset=)(["\'])([^"\']+)\2/i', $tag, $srcset, PREG_OFFSET_CAPTURE) !== 1) {
+            return $tag;
+        }
+
+        $hasType = preg_match('/(\stype=)(["\']?)([^"\'\s>]*)\2/i', $tag, $type, PREG_OFFSET_CAPTURE) === 1;
+        $value   = $srcset[3][0];
+
+        if (!$hasType) {
+            return substr_replace($tag, $this->rewriteSrcset($value), $srcset[3][1], \strlen($value));
+        }
+
+        if (!\in_array(strtolower(trim($type[3][0])), ['image/jpeg', 'image/png'], true)) {
+            return $tag;
+        }
+
+        $rewritten = $this->rewriteSrcset($value, $all);
+
+        if (!$all) {
+            return $tag;
+        }
+
+        // Replace the later attribute first, so the offset of the earlier one stays valid.
+        $replacements = [
+            [$srcset[3][1], \strlen($value), $rewritten],
+            [$type[3][1], \strlen($type[3][0]), 'image/webp'],
+        ];
+
+        usort($replacements, static fn (array $a, array $b): int => $b[0] <=> $a[0]);
+
+        foreach ($replacements as [$offset, $length, $replacement]) {
+            $tag = substr_replace($tag, $replacement, $offset, $length);
+        }
+
+        return $tag;
+    }
+
+    /**
      * Rewrites every image candidate of a srcset value.
      *
-     * @param   string  $srcset  srcset attribute value
+     * @param   string     $srcset  srcset attribute value
+     * @param   bool|null  $all     Set to true when every candidate was rewritten to WebP
      *
      * @return  string
      *
      * @since   1.2.0
      */
-    private function rewriteSrcset(string $srcset): string
+    private function rewriteSrcset(string $srcset, ?bool &$all = null): string
     {
+        $all        = true;
         $candidates = array_map(
-            function (string $candidate): string {
+            function (string $candidate) use (&$all): string {
                 $parts = preg_split('/\s+/', trim($candidate), 2);
 
                 if ($parts === false || $parts[0] === '') {
+                    $all = false;
+
                     return trim($candidate);
                 }
 
-                $parts[0] = $this->toWebpUrl($parts[0]);
+                $url      = $this->toWebpUrl($parts[0]);
+                $all      = $all && $url !== $parts[0];
+                $parts[0] = $url;
 
                 return implode(' ', $parts);
             },
